@@ -1,0 +1,349 @@
+@import "tailwindcss";
+
+/*
+  koedama の版面。
+  投稿型の創作プラットフォームの型に寄せる。明るい寒色の地、白いカード、
+  細い罫、丸みのある角、数字とタグが並ぶ一覧。
+
+  そのうえで、このサービスにしかない層をひとつ残す。
+  作品には版が必ず付き、それが等幅で薄く添えられている。
+  いつの原稿を見ているかが常に分かることが、他の投稿サイトとの差になる。
+  照合用のハッシュは一覧には出さず、記録の書き出しの画面へ集める。
+*/
+
+@theme {
+  --color-canvas: #fafdfe;
+  --color-surface: #ffffff;
+  --color-surface-sunk: #f2f8fa;
+
+  --color-ink: #0f2229;
+  --color-ink-soft: #4d646c;
+  --color-ink-faint: #8ba2aa;
+
+  --color-line: #e0ebef;
+  --color-line-strong: #c9dbe1;
+
+  /* 進む・押せるものは藍緑。止まっている・できないものは朱。役割を混ぜない */
+  --color-accent: #0a6c7e;
+  --color-accent-deep: #075866;
+  --color-accent-wash: #e6f3f6;
+  --color-stop: #c4482c;
+  --color-stop-wash: #fbeae5;
+
+  --font-sans: var(--font-mplus), "Hiragino Sans", "Yu Gothic", sans-serif;
+  --font-code: var(--font-mplus-code), ui-monospace, SFMono-Regular, monospace;
+
+  --radius-card: 10px;
+  --radius-chip: 999px;
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    background: var(--color-canvas);
+  }
+
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.85;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-ink-faint);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .shell {
+    max-width: 68rem;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+  }
+  .shell-narrow {
+    max-width: 44rem;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+  }
+
+  /* 機械が刻んだ層。ハッシュ、ID、日時 */
+  .code {
+    font-family: var(--font-code);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+  }
+
+  .label {
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    color: var(--color-ink-faint);
+  }
+
+  /* --- カード --- */
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-card);
+  }
+  .card-link {
+    display: block;
+    transition:
+      border-color 0.16s ease,
+      box-shadow 0.16s ease,
+      transform 0.16s ease;
+  }
+  .card-link:hover {
+    border-color: var(--color-line-strong);
+    box-shadow: 0 6px 20px -12px rgb(15 34 41 / 0.28);
+    transform: translateY(-1px);
+  }
+
+  /* --- チップ。制作条件やレーティングを並べる --- */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.62rem;
+    border-radius: var(--radius-chip);
+    background: var(--color-surface-sunk);
+    color: var(--color-ink-soft);
+    font-size: 0.76rem;
+    line-height: 1.7;
+    white-space: nowrap;
+  }
+  .chip-accent {
+    background: var(--color-accent-wash);
+    color: var(--color-accent-deep);
+  }
+  .chip-stop {
+    background: var(--color-stop-wash);
+    color: var(--color-stop);
+  }
+  .chip-outline {
+    background: transparent;
+    border: 1px solid var(--color-line-strong);
+    color: var(--color-ink-soft);
+  }
+
+  /* --- ボタン --- */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.62rem 1.35rem;
+    border-radius: 7px;
+    border: 1px solid transparent;
+    background: var(--color-accent);
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .btn:hover {
+    background: var(--color-accent-deep);
+  }
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* 戻せない操作。退会のように、押したら終わりのものだけに使う */
+  .btn-stop {
+    border-color: var(--color-stop);
+    color: var(--color-stop);
+  }
+
+  .btn-stop:hover {
+    background: var(--color-stop);
+    color: var(--color-surface);
+  }
+
+  .btn-ghost {
+    background: var(--color-surface);
+    border-color: var(--color-line-strong);
+    color: var(--color-ink);
+  }
+  .btn-ghost:hover {
+    background: var(--color-surface-sunk);
+  }
+
+
+  .btn-sm {
+    padding: 0.4rem 0.9rem;
+    font-size: 0.83rem;
+  }
+
+  /* --- 入力 --- */
+  .field {
+    display: block;
+    width: 100%;
+    padding: 0.62rem 0.85rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line-strong);
+    border-radius: 7px;
+    transition: border-color 0.15s ease;
+  }
+  .field:hover {
+    border-color: var(--color-accent);
+  }
+  .field:focus {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -1px;
+    border-color: transparent;
+  }
+
+  .field-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--color-ink-soft);
+    margin-bottom: 0.4rem;
+  }
+
+
+  /* --- 節の見出し --- */
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  .section-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  .divider {
+    border: 0;
+    border-top: 1px solid var(--color-line);
+  }
+
+  /* --- 折り畳み。既定は閉じておき、押すと開く --- */
+  .fold {
+    border: 1px solid var(--color-line);
+    border-radius: 7px;
+    background: var(--color-surface);
+  }
+  .fold > summary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.9rem;
+    cursor: pointer;
+    list-style: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    user-select: none;
+  }
+  .fold > summary::-webkit-details-marker {
+    display: none;
+  }
+  .fold > summary::before {
+    content: "▸";
+    font-size: 0.7rem;
+    color: var(--color-ink-faint);
+    transition: transform 0.15s ease;
+  }
+  .fold[open] > summary::before {
+    transform: rotate(90deg);
+  }
+  .fold > summary:hover {
+    color: var(--color-accent);
+  }
+  .fold[open] > summary {
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  /* 作品情報の表 */
+  .spec-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+  }
+  .spec-table th {
+    width: 7rem;
+    padding: 0.38rem 0.7rem;
+    text-align: left;
+    font-weight: 500;
+    color: var(--color-ink-faint);
+    border-bottom: 1px solid var(--color-line);
+    vertical-align: top;
+  }
+  .spec-table td {
+    padding: 0.38rem 0.7rem;
+    border-bottom: 1px solid var(--color-line);
+  }
+  .spec-table tr:last-child th,
+  .spec-table tr:last-child td {
+    border-bottom: 0;
+  }
+}
+
+/* 一覧やカードの立ち上がり。控えめに一度だけ */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.45rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise > * {
+  animation: rise 0.44s cubic-bezier(0.22, 0.7, 0.25, 1) both;
+}
+.rise > *:nth-child(1) { animation-delay: 0.01s; }
+.rise > *:nth-child(2) { animation-delay: 0.06s; }
+.rise > *:nth-child(3) { animation-delay: 0.11s; }
+.rise > *:nth-child(4) { animation-delay: 0.16s; }
+.rise > *:nth-child(5) { animation-delay: 0.21s; }
+.rise > *:nth-child(6) { animation-delay: 0.26s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rise > * {
+    animation: none;
+  }
+}
+
+
+@media print {
+  body {
+    background: #fff;
+  }
+}
