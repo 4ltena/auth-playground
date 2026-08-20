@@ -1,7 +1,10 @@
 import { scorePasswordStrength } from "@/lib/auth/password";
 
-const LABELS = ["非常に弱い", "弱い", "普通", "強い", "非常に強い"];
-const COLORS = ["bg-red-500", "bg-orange-500", "bg-yellow-500", "bg-lime-500", "bg-green-600"];
+// One entry per possible score (0-5) — scorePasswordStrength awards up to
+// 5 points (length x2, mixed case, digit, symbol), so this needs 6 entries
+// or the top score renders with an undefined label/color.
+const LABELS = ["非常に弱い", "弱い", "普通", "普通以上", "強い", "非常に強い"];
+const COLORS = ["bg-red-500", "bg-orange-500", "bg-yellow-500", "bg-yellow-500", "bg-lime-500", "bg-green-600"];
 
 export function PasswordStrengthMeter({ password }: { password: string }) {
   if (password.length === 0) return null;
@@ -10,7 +13,7 @@ export function PasswordStrengthMeter({ password }: { password: string }) {
   return (
     <div className="mt-1" aria-live="polite">
       <div className="flex gap-1 h-1.5">
-        {Array.from({ length: 5 }, (_, i) => (
+        {LABELS.map((_, i) => (
           <div key={i} className={`flex-1 rounded ${i <= score ? COLORS[score] : "bg-gray-200"}`} />
         ))}
       </div>

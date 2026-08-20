@@ -26,6 +26,10 @@ function isStale(lastAttemptAt: Date): boolean {
 }
 
 export async function checkLoginAttempt(email: string) {
+  // An empty email has no bucket of its own — every malformed/anonymous
+  // request would otherwise share one "" identifier and lock each other out.
+  if (!email) return { locked: false, requireCaptcha: false, failedCount: 0 };
+
   const identifier = makeIdentifier(email);
   const record = await prisma.loginAttempt.findUnique({ where: { identifier } });
 
@@ -40,6 +44,8 @@ export async function checkLoginAttempt(email: string) {
 }
 
 export async function recordLoginFailure(email: string) {
+  if (!email) return;
+
   const identifier = makeIdentifier(email);
   const existing = await prisma.loginAttempt.findUnique({ where: { identifier } });
   const baseline = existing && !isStale(existing.lastAttemptAt) ? existing.failedCount : 0;
