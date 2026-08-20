@@ -5,12 +5,17 @@ const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 export const CAPTCHA_REQUIRED_AFTER_FAILURES = 3;
 
-function makeIdentifier(email: string, ip: string): string {
-  return `${email}|${ip}`;
+// Keyed on email alone, NOT email+IP. `X-Forwarded-For` is client-supplied
+// and trivially spoofable (see lib/http/client-ip.ts) — keying on IP would
+// let an attacker open a fresh rate-limit bucket per request just by
+// rotating the header, defeating the limiter entirely. IP is still recorded
+// in LoginHistory for visibility, just not used as a bypassable lock key.
+function makeIdentifier(email: string): string {
+  return email;
 }
 
-export async function checkLoginAttempt(email: string, ip: string) {
-  const identifier = makeIdentifier(email, ip);
+export async function checkLoginAttempt(email: string) {
+  const identifier = makeIdentifier(email);
   const record = await prisma.loginAttempt.findUnique({ where: { identifier } });
 
   const locked = !!record?.lockedUntil && record.lockedUntil > new Date();
@@ -19,8 +24,8 @@ export async function checkLoginAttempt(email: string, ip: string) {
   return { locked, requireCaptcha, failedCount: record?.failedCount ?? 0 };
 }
 
-export async function recordLoginFailure(email: string, ip: string) {
-  const identifier = makeIdentifier(email, ip);
+export async function recordLoginFailure(email: string) {
+  const identifier = makeIdentifier(email);
   const existing = await prisma.loginAttempt.findUnique({ where: { identifier } });
   const failedCount = (existing?.failedCount ?? 0) + 1;
   const lockedUntil =
@@ -33,22 +38,11 @@ export async function recordLoginFailure(email: string, ip: string) {
   });
 }
 
-export async function resetLoginAttempts(email: string, ip: string) {
-  const identifier = makeIdentifier(email, ip);
+export async function resetLoginAttempts(email: string) {
+  const identifier = makeIdentifier(email);
   await prisma.loginAttempt.deleteMany({ where: { identifier } });
 }
 
-export async function unlockLoginAttempt(identifier: string) {
-  await prisma.loginAttempt.update({
-    where: { identifier },
-    data: { failedCount: 0, lockedUntil: null },
-  });
-}
-
-// Admin "unlock" action: clears every rate-limit bucket for this email,
-// regardless of which IP triggered it.
 export async function unlockAllForEmail(email: string) {
-  await prisma.loginAttempt.deleteMany({
-    where: { identifier: { startsWith: `${email}|` } },
-  });
+  await prisma.loginAttempt.deleteMany({ where: { identifier: makeIdentifier(email) } });
 }

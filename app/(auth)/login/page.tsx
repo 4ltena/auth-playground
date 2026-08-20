@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { PasswordInput } from "@/app/_components/auth/PasswordInput";
 import { CaptchaWidget } from "@/app/_components/auth/CaptchaWidget";
+import { safeNextPath } from "@/lib/http/safe-redirect-client";
 
 const REMEMBERED_EMAIL_KEY = "auth_playground_remembered_email";
 
@@ -67,7 +68,7 @@ function LoginForm() {
     if (autofillId) localStorage.setItem(REMEMBERED_EMAIL_KEY, email);
     else localStorage.removeItem(REMEMBERED_EMAIL_KEY);
 
-    const next = searchParams.get("next") ?? "/account";
+    const next = safeNextPath(searchParams.get("next"), "/account");
     router.push(next);
     router.refresh();
   }

@@ -4,7 +4,13 @@ import { randomInt } from "node:crypto";
 
 const CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous chars (I,O,0,1)
 const CAPTCHA_LENGTH = 5;
-const CAPTCHA_TTL_SECONDS = 5 * 60;
+// Short TTL is a partial mitigation for replay, not a fix: this token is a
+// stateless signed JWT, so the same token+answer pair is valid for every
+// request until it expires (no server-side "already used" tracking). A real
+// fix needs a server-side single-use store (e.g. record the JWT `jti` in the
+// DB on issue, delete-on-verify, reject already-consumed jti) — left as a
+// known gap, tracked in the SDD ledger, not implemented in this pass.
+const CAPTCHA_TTL_SECONDS = 2 * 60;
 
 function getSecretKey(): Uint8Array {
   const secret = process.env.JWT_SECRET;

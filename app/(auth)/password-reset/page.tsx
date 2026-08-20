@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { PasswordInput } from "@/app/_components/auth/PasswordInput";
+import { CaptchaWidget } from "@/app/_components/auth/CaptchaWidget";
 
 export default function PasswordResetPage() {
   const router = useRouter();
@@ -11,6 +12,9 @@ export default function PasswordResetPage() {
   const [questionLabel, setQuestionLabel] = useState("");
   const [securityAnswer, setSecurityAnswer] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [requireCaptcha, setRequireCaptcha] = useState(false);
+  const [captchaAnswer, setCaptchaAnswer] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   async function handleLookup(event: FormEvent) {
@@ -36,11 +40,20 @@ export default function PasswordResetPage() {
     const res = await fetch("/api/auth/password-reset/reset", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, securityAnswer, newPassword }),
+      body: JSON.stringify({ email, securityAnswer, newPassword, captchaToken, captchaAnswer }),
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      setError(data.error === "answer_mismatch" ? "答えが正しくありません。" : "パスワードの再設定に失敗しました。");
+      if (data.requireCaptcha) setRequireCaptcha(true);
+      setError(
+        data.error === "answer_mismatch"
+          ? "答えが正しくありません。"
+          : data.error === "locked"
+            ? "試行回数が上限に達しました。しばらくしてから再度お試しください。"
+            : data.error === "captcha_failed"
+              ? "画像の文字が正しくありません。"
+              : "パスワードの再設定に失敗しました。",
+      );
       return;
     }
     router.push("/login?resetDone=1");
@@ -88,6 +101,9 @@ export default function PasswordResetPage() {
             autoComplete="new-password"
             showStrength
           />
+          {requireCaptcha ? (
+            <CaptchaWidget answer={captchaAnswer} onAnswerChange={setCaptchaAnswer} onTokenChange={setCaptchaToken} />
+          ) : null}
           {error ? (
             <p role="alert" className="text-[0.85rem] text-stop">
               {error}

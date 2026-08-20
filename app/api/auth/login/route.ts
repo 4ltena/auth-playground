@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   const ip = clientIpFromRequest(request);
   const userAgent = request.headers.get("user-agent");
 
-  const { locked, requireCaptcha } = await checkLoginAttempt(email, ip);
+  const { locked, requireCaptcha } = await checkLoginAttempt(email);
   if (locked) {
     return NextResponse.json({ error: "locked" }, { status: 429 });
   }
@@ -31,16 +31,25 @@ export async function POST(request: Request) {
   const user = email ? await findUserByEmail(email) : null;
   const passwordOk = user ? await verifyPassword(password, user.passwordHash) : false;
 
-  if (!user || !passwordOk || user.status === "SUSPENDED") {
-    await recordLoginFailure(email, ip);
+  if (!user || !passwordOk) {
+    await recordLoginFailure(email);
     if (user) {
       await recordLoginHistory({ userId: user.id, success: false, ipAddress: ip, userAgent });
     }
-    const error = user?.status === "SUSPENDED" ? "account_suspended" : "invalid_credentials";
-    return NextResponse.json({ error }, { status: 401 });
+    return NextResponse.json({ error: "invalid_credentials" }, { status: 401 });
   }
 
-  await resetLoginAttempts(email, ip);
+  // Suspension is checked separately from the credential check, and does NOT
+  // count against the rate limiter — the password was correct, so counting
+  // it as a "failure" would let an admin's suspend action lock the account
+  // owner out of their own rate-limit bucket (a real account-holder with the
+  // right password shouldn't be treated the same as a guesser).
+  if (user.status === "SUSPENDED") {
+    await recordLoginHistory({ userId: user.id, success: false, ipAddress: ip, userAgent });
+    return NextResponse.json({ error: "account_suspended" }, { status: 401 });
+  }
+
+  await resetLoginAttempts(email);
   await recordLoginHistory({ userId: user.id, success: true, ipAddress: ip, userAgent });
 
   const accessToken = await signAccessToken({ sub: user.id, email: user.email, role: user.role });
