@@ -1,0 +1,29 @@
+node_modules/
+dist/
+build/
+/.next/
+/out/
+next-env.d.ts
+*.tsbuildinfo
+*.log
+.DS_Store
+
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+/.claude/
+/.codex/
+/.cursor/
+/.superpowers/
+
+.env.local
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/.playwright/
+e2e/.auth/
+
+# Design docs and internal specs are local-only, not tracked in git
+docs/
