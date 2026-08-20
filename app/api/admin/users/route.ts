@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { NextResponse, type NextRequest } from "next/server";
+import { getCurrentUserFromRequest } from "@/lib/auth/current-user";
 import { listUsers } from "@/lib/data/user";
 
-export async function GET() {
-  const currentUser = await getCurrentUser();
+export async function GET(request: NextRequest) {
+  const currentUser = await getCurrentUserFromRequest(request);
   if (!currentUser || currentUser.role !== "ADMIN") {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }

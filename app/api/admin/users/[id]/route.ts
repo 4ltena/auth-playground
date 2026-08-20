@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { NextResponse, type NextRequest } from "next/server";
+import { getCurrentUserFromRequest } from "@/lib/auth/current-user";
 import { findUserById, setUserStatus } from "@/lib/data/user";
 import { unlockAllForEmail } from "@/lib/auth/rateLimit";
 import { isSameOriginRequest } from "@/lib/http/origin-check";
@@ -11,12 +11,12 @@ function isAction(value: unknown): value is Action {
   return typeof value === "string" && (ACTIONS as readonly string[]).includes(value);
 }
 
-export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   if (!isSameOriginRequest(request)) {
     return NextResponse.json({ error: "invalid_origin" }, { status: 403 });
   }
 
-  const currentUser = await getCurrentUser();
+  const currentUser = await getCurrentUserFromRequest(request);
   if (!currentUser || currentUser.role !== "ADMIN") {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }

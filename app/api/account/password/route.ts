@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { NextResponse, type NextRequest } from "next/server";
+import { getCurrentUserFromRequest } from "@/lib/auth/current-user";
 import { findUserById, updatePassword } from "@/lib/data/user";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { revokeAllRefreshTokensForUser, REFRESH_TOKEN_COOKIE } from "@/lib/auth/session";
@@ -8,12 +7,12 @@ import { isSameOriginRequest } from "@/lib/http/origin-check";
 
 const MIN_PASSWORD_LENGTH = 8;
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   if (!isSameOriginRequest(request)) {
     return NextResponse.json({ error: "invalid_origin" }, { status: 403 });
   }
 
-  const currentUser = await getCurrentUser();
+  const currentUser = await getCurrentUserFromRequest(request);
   if (!currentUser) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const body = await request.json().catch(() => null);
@@ -36,8 +35,7 @@ export async function POST(request: Request) {
   // that force-logs-out the person who just typed the current password
   // correctly would be a confusing self-inflicted lockout, not a security
   // improvement.
-  const jar = await cookies();
-  const currentRefreshToken = jar.get(REFRESH_TOKEN_COOKIE)?.value;
+  const currentRefreshToken = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value;
   await revokeAllRefreshTokensForUser(user.id, currentRefreshToken);
 
   return NextResponse.json({ ok: true });

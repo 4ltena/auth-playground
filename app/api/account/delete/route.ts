@@ -1,18 +1,17 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { NextResponse, type NextRequest } from "next/server";
+import { getCurrentUserFromRequest } from "@/lib/auth/current-user";
 import { findUserById, deleteUser } from "@/lib/data/user";
 import { verifyPassword } from "@/lib/auth/password";
 import { ACCESS_TOKEN_COOKIE } from "@/lib/auth/jwt";
 import { REFRESH_TOKEN_COOKIE } from "@/lib/auth/session";
 import { isSameOriginRequest } from "@/lib/http/origin-check";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   if (!isSameOriginRequest(request)) {
     return NextResponse.json({ error: "invalid_origin" }, { status: 403 });
   }
 
-  const currentUser = await getCurrentUser();
+  const currentUser = await getCurrentUserFromRequest(request);
   if (!currentUser) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const body = await request.json().catch(() => null);
@@ -28,9 +27,9 @@ export async function POST(request: Request) {
   // Cascades to RefreshToken/LoginHistory/SecurityQuestion via schema.prisma onDelete: Cascade.
   await deleteUser(user.id);
 
-  const jar = await cookies();
-  jar.delete(ACCESS_TOKEN_COOKIE);
-  jar.delete(REFRESH_TOKEN_COOKIE);
+  const response = NextResponse.json({ ok: true });
+  response.cookies.delete(ACCESS_TOKEN_COOKIE);
+  response.cookies.delete(REFRESH_TOKEN_COOKIE);
 
-  return NextResponse.json({ ok: true });
+  return response;
 }

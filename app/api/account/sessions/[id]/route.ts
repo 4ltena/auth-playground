@@ -1,14 +1,14 @@
-import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { NextResponse, type NextRequest } from "next/server";
+import { getCurrentUserFromRequest } from "@/lib/auth/current-user";
 import { revokeSessionById } from "@/lib/auth/session";
 import { isSameOriginRequest } from "@/lib/http/origin-check";
 
-export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   if (!isSameOriginRequest(request)) {
     return NextResponse.json({ error: "invalid_origin" }, { status: 403 });
   }
 
-  const currentUser = await getCurrentUser();
+  const currentUser = await getCurrentUserFromRequest(request);
   if (!currentUser) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const { id } = await context.params;

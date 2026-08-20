@@ -31,7 +31,9 @@ export function CaptchaWidget({
 
   return (
     <div className="flex flex-col gap-1">
-      <span className="field-label">画像の文字を入力してください</span>
+      <label htmlFor={id} className="field-label">
+        画像の文字を入力してください
+      </label>
       <div className="flex items-center gap-2">
         {svg ? (
           // Safe: svg is server-generated in lib/auth/captcha.ts from a fixed

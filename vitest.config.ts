@@ -6,8 +6,18 @@ export default defineConfig({
     include: ["lib/**/*.test.ts", "app/**/*.test.ts", "*.test.ts"],
     env: {
       JWT_SECRET: "test-secret-at-least-32-bytes-long-000000",
-      DATABASE_URL: "file:./prisma/test.db",
+      // Relative to prisma/schema.prisma's directory, not the cwd — this
+      // resolves to prisma/test.db, not prisma/prisma/test.db (see the same
+      // gotcha noted in .env.local for DATABASE_URL).
+      DATABASE_URL: "file:./test.db",
     },
+    // Every DB-touching test file's afterEach does an unscoped deleteMany()
+    // (simplest way to keep each test isolated within its own file). Running
+    // test files in parallel against the same SQLite file lets one file's
+    // cleanup wipe rows a concurrently-running file is still using —
+    // observed as spurious foreign-key/unique-constraint failures. Files
+    // still run in one process (no IPC overhead), just not concurrently.
+    fileParallelism: false,
   },
   resolve: {
     alias: {

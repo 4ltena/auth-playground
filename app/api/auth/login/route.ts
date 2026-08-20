@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { verifyPassword } from "@/lib/auth/password";
 import { signAccessToken, ACCESS_TOKEN_COOKIE, ACCESS_TOKEN_MAX_AGE } from "@/lib/auth/jwt";
 import { issueRefreshToken, REFRESH_TOKEN_COOKIE } from "@/lib/auth/session";
@@ -65,15 +64,15 @@ export async function POST(request: Request) {
     ipAddress: ip,
   });
 
-  const jar = await cookies();
-  jar.set(ACCESS_TOKEN_COOKIE, accessToken, {
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set(ACCESS_TOKEN_COOKIE, accessToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: ACCESS_TOKEN_MAX_AGE,
   });
-  jar.set(REFRESH_TOKEN_COOKIE, refreshToken, {
+  response.cookies.set(REFRESH_TOKEN_COOKIE, refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -81,5 +80,5 @@ export async function POST(request: Request) {
     maxAge: maxAgeSeconds,
   });
 
-  return NextResponse.json({ ok: true });
+  return response;
 }
