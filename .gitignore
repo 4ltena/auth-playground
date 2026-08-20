@@ -18,6 +18,10 @@ GEMINI.md
 
 .env.local
 
+# SQLite dev/test databases
+prisma/*.db
+prisma/*.db-journal
+
 # Playwright
 /test-results/
 /playwright-report/
