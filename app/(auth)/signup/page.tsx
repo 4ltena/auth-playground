@@ -32,6 +32,7 @@ export default function SignupPage() {
   const [securityAnswer, setSecurityAnswer] = useState("");
   const [captchaAnswer, setCaptchaAnswer] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaRound, setCaptchaRound] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -72,6 +73,8 @@ export default function SignupPage() {
     if (!response.ok) {
       const data: unknown = await response.json().catch(() => ({}));
       const code = (data as { error?: unknown })?.error;
+      setCaptchaRound((round) => round + 1); // fresh challenge on any failure, spent token/answer is unusable
+      setCaptchaAnswer("");
       setError(isSignupErrorCode(code) ? SIGNUP_ERROR_MESSAGE[code] : "登録に失敗しました。");
       return;
     }

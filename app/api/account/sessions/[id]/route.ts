@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { revokeSessionById } from "@/lib/auth/session";
+import { isSameOriginRequest } from "@/lib/http/origin-check";
 
-export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ error: "invalid_origin" }, { status: 403 });
+  }
+
   const currentUser = await getCurrentUser();
   if (!currentUser) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const { id } = await context.params;
-  await revokeSessionById(currentUser.sub, id);
+  const revoked = await revokeSessionById(currentUser.sub, id);
+  if (!revoked) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
   return NextResponse.json({ ok: true });
 }

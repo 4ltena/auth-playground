@@ -5,6 +5,7 @@ import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { revokeAllRefreshTokensForUser } from "@/lib/auth/session";
 import { checkLoginAttempt, recordLoginFailure, resetLoginAttempts } from "@/lib/auth/rateLimit";
 import { verifyCaptcha } from "@/lib/auth/captcha";
+import { isSameOriginRequest } from "@/lib/http/origin-check";
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -13,6 +14,10 @@ const MIN_PASSWORD_LENGTH = 8;
 // keyed on email) so an attacker can't bypass password guessing by
 // switching to the security-question flow instead.
 export async function POST(request: Request) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ error: "invalid_origin" }, { status: 403 });
+  }
+
   const body = await request.json().catch(() => null);
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   const securityAnswer = typeof body?.securityAnswer === "string" ? body.securityAnswer : "";

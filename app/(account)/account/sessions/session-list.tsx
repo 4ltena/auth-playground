@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { fetchWithSilentRefresh } from "@/lib/auth/silent-refresh";
+import { fullDateTime } from "@/app/_components/format";
 
 type Session = {
   id: string;
@@ -13,9 +15,14 @@ type Session = {
 
 export function SessionList() {
   const [sessions, setSessions] = useState<Session[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
-    const res = await fetch("/api/account/sessions");
+    const res = await fetchWithSilentRefresh("/api/account/sessions");
+    if (!res.ok) {
+      setError("読み込みに失敗しました。再度ログインしてください。");
+      return;
+    }
     const data = await res.json();
     setSessions(data.sessions);
   }
@@ -25,10 +32,11 @@ export function SessionList() {
   }, []);
 
   async function handleRevoke(id: string) {
-    await fetch(`/api/account/sessions/${id}`, { method: "DELETE" });
+    await fetchWithSilentRefresh(`/api/account/sessions/${id}`, { method: "DELETE" });
     load();
   }
 
+  if (error) return <p role="alert">{error}</p>;
   if (!sessions) return <p>読み込み中…</p>;
   if (sessions.length === 0) return <p>アクティブなセッションはありません。</p>;
 
@@ -39,7 +47,7 @@ export function SessionList() {
           <div>
             <p className="text-[0.9rem]">{s.userAgent ?? "不明な端末"}</p>
             <p className="text-[0.8rem] text-ink-soft">
-              IP: {s.ipAddress ?? "不明"} / 最終利用: {new Date(s.lastUsedAt).toLocaleString("ja-JP")}
+              IP: {s.ipAddress ?? "不明"} / 最終利用: {fullDateTime(s.lastUsedAt)}
               {s.rememberMe ? "（ログイン状態を保持）" : ""}
             </p>
           </div>

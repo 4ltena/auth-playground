@@ -4,11 +4,16 @@ import { createUser, findUserByEmail } from "@/lib/data/user";
 import { setSecurityQuestion } from "@/lib/data/securityQuestion";
 import { isSecurityQuestionKey } from "@/lib/auth/securityQuestions";
 import { verifyCaptcha } from "@/lib/auth/captcha";
+import { isSameOriginRequest } from "@/lib/http/origin-check";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
 
 export async function POST(request: Request) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ error: "invalid_origin" }, { status: 403 });
+  }
+
   const body = await request.json().catch(() => null);
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body?.password === "string" ? body.password : "";

@@ -1,26 +1,19 @@
-import { SITE_URL } from "@/lib/site";
 import type { MetadataRoute } from "next";
 
-/*
- * Google の文書はこう定めている。
- * robots.txt で遮っただけでは索引を防げない。クローラが noindex を読めなくなるだけで、
- * 他所からリンクされていれば索引されうる。索引を止めるには noindex を読ませる必要がある。
- *
- * したがって、非公開の経路はクロールを許したうえで、各ページに noindex を出す。
- * 遮るのは、索引の対象になりようがない内部の経路だけにとどめる。
- */
-
-
+// Blocking with robots.txt alone doesn't prevent indexing — a crawler that
+// can't read the page also can't read a noindex tag on it, and an
+// externally-linked page can still get indexed. So disallow only routes
+// that can never be meaningfully indexed (API, Next.js internals); every
+// other private route (/account, /admin) carries its own noindex metadata
+// instead (see app/_components/noindex.ts).
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
       {
         userAgent: "*",
         allow: "/",
-        // API と Next.js の内部経路のみ遮る。/s と /works は noindex で止める
         disallow: ["/api/", "/_next/"],
       },
     ],
-    sitemap: `${SITE_URL}/sitemap.xml`,
   };
 }

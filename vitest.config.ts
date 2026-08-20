@@ -2,10 +2,12 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    // app/ も見る。掲示物（規約・プライバシーポリシー・権利侵害の申出）は
-    // app/ にあり、実装とずれても画面は普通に出るので、試験で縛る必要がある。
-    include: ["lib/**/*.test.ts", "app/**/*.test.ts"],
-    env: { KOEDAMA_HASH_PEPPER: "test-pepper" },
+    // Also matches root-level test files (e.g. proxy.test.ts).
+    include: ["lib/**/*.test.ts", "app/**/*.test.ts", "*.test.ts"],
+    env: {
+      JWT_SECRET: "test-secret-at-least-32-bytes-long-000000",
+      DATABASE_URL: "file:./prisma/test.db",
+    },
   },
   resolve: {
     alias: {

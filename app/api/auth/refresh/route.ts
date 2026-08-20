@@ -3,10 +3,15 @@ import { cookies } from "next/headers";
 import { signAccessToken, ACCESS_TOKEN_COOKIE, ACCESS_TOKEN_MAX_AGE } from "@/lib/auth/jwt";
 import { rotateRefreshToken, REFRESH_TOKEN_COOKIE } from "@/lib/auth/session";
 import { findUserById } from "@/lib/data/user";
+import { isSameOriginRequest } from "@/lib/http/origin-check";
 
 // Silent refresh endpoint: exchanges a valid refresh token cookie for a new
 // access token, rotating the refresh token in the same call.
-export async function POST() {
+export async function POST(request: Request) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ error: "invalid_origin" }, { status: 403 });
+  }
+
   const jar = await cookies();
   const refreshToken = jar.get(REFRESH_TOKEN_COOKIE)?.value;
 

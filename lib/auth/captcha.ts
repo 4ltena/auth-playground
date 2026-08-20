@@ -12,6 +12,11 @@ const CAPTCHA_LENGTH = 5;
 // known gap, tracked in the SDD ledger, not implemented in this pass.
 const CAPTCHA_TTL_SECONDS = 2 * 60;
 
+// Shares JWT_SECRET with lib/auth/jwt.ts's access tokens — `aud` keeps the
+// two token kinds from being interchangeable (see the matching comment in
+// jwt.ts).
+const CAPTCHA_AUDIENCE = "auth-playground:captcha";
+
 function getSecretKey(): Uint8Array {
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error("JWT_SECRET is not set");
@@ -49,6 +54,7 @@ export async function generateCaptcha(): Promise<{ svg: string; token: string }>
   const text = randomText();
   const token = await new SignJWT({ answer: text })
     .setProtectedHeader({ alg: "HS256" })
+    .setAudience(CAPTCHA_AUDIENCE)
     .setIssuedAt()
     .setExpirationTime(`${CAPTCHA_TTL_SECONDS}s`)
     .sign(getSecretKey());
@@ -57,7 +63,7 @@ export async function generateCaptcha(): Promise<{ svg: string; token: string }>
 
 export async function verifyCaptcha(token: string, answer: string): Promise<boolean> {
   try {
-    const { payload } = await jwtVerify(token, getSecretKey());
+    const { payload } = await jwtVerify(token, getSecretKey(), { audience: CAPTCHA_AUDIENCE });
     if (typeof payload.answer !== "string") return false;
     return payload.answer.toUpperCase() === answer.trim().toUpperCase();
   } catch {

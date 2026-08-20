@@ -5,8 +5,13 @@ import { findUserById, deleteUser } from "@/lib/data/user";
 import { verifyPassword } from "@/lib/auth/password";
 import { ACCESS_TOKEN_COOKIE } from "@/lib/auth/jwt";
 import { REFRESH_TOKEN_COOKIE } from "@/lib/auth/session";
+import { isSameOriginRequest } from "@/lib/http/origin-check";
 
 export async function POST(request: Request) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ error: "invalid_origin" }, { status: 403 });
+  }
+
   const currentUser = await getCurrentUser();
   if (!currentUser) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 

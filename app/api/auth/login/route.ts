@@ -8,8 +8,13 @@ import { recordLoginHistory } from "@/lib/data/loginHistory";
 import { checkLoginAttempt, recordLoginFailure, resetLoginAttempts } from "@/lib/auth/rateLimit";
 import { verifyCaptcha } from "@/lib/auth/captcha";
 import { clientIpFromRequest } from "@/lib/http/client-ip";
+import { isSameOriginRequest } from "@/lib/http/origin-check";
 
 export async function POST(request: Request) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ error: "invalid_origin" }, { status: 403 });
+  }
+
   const body = await request.json().catch(() => null);
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body?.password === "string" ? body.password : "";

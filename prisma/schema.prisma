@@ -47,7 +47,8 @@ model RefreshToken {
   @@index([userId])
 }
 
-// identifier = "<email>|<ip>", a single rate-limit bucket per Global Constraints
+// identifier = email alone (NOT email+IP — X-Forwarded-For is spoofable by
+// the client, see lib/auth/rateLimit.ts for why). One bucket per email.
 model LoginAttempt {
   id            String    @id @default(cuid())
   identifier    String    @unique

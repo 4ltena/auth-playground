@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { fetchWithSilentRefresh } from "@/lib/auth/silent-refresh";
 
 type AdminUser = {
   id: string;
@@ -12,9 +13,14 @@ type AdminUser = {
 
 export function UserTable() {
   const [users, setUsers] = useState<AdminUser[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
-    const res = await fetch("/api/admin/users");
+    const res = await fetchWithSilentRefresh("/api/admin/users");
+    if (!res.ok) {
+      setError("読み込みに失敗しました。管理者としてログインし直してください。");
+      return;
+    }
     const data = await res.json();
     setUsers(data.users ?? []);
   }
@@ -24,7 +30,7 @@ export function UserTable() {
   }, []);
 
   async function act(id: string, action: "suspend" | "activate" | "unlock") {
-    await fetch(`/api/admin/users/${id}`, {
+    await fetchWithSilentRefresh(`/api/admin/users/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action }),
@@ -32,6 +38,7 @@ export function UserTable() {
     load();
   }
 
+  if (error) return <p role="alert">{error}</p>;
   if (!users) return <p>読み込み中…</p>;
 
   return (

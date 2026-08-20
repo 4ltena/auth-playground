@@ -34,6 +34,7 @@ function LoginForm() {
   const [requireCaptcha, setRequireCaptcha] = useState(false);
   const [captchaAnswer, setCaptchaAnswer] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaRound, setCaptchaRound] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -61,6 +62,13 @@ function LoginForm() {
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       if (data.requireCaptcha) setRequireCaptcha(true);
+      // Force CaptchaWidget to remount and fetch a fresh challenge — the
+      // token+answer just submitted is spent (either wrong, or the
+      // request failed for another reason and shouldn't be resubmitted
+      // verbatim), and a stale widget otherwise sits there letting the
+      // user resubmit the same wrong answer until they hit "再表示" themselves.
+      setCaptchaRound((round) => round + 1);
+      setCaptchaAnswer("");
       setError(LOGIN_ERROR_MESSAGE[data.error] ?? "ログインに失敗しました。");
       return;
     }
@@ -78,6 +86,9 @@ function LoginForm() {
       <h1 className="font-bold tracking-tight text-3xl mb-8">ログイン</h1>
       {searchParams.get("signedUp") === "1" ? (
         <p className="mb-6 text-[0.9rem]">登録が完了しました。ログインしてください。</p>
+      ) : null}
+      {searchParams.get("resetDone") === "1" ? (
+        <p className="mb-6 text-[0.9rem]">パスワードを再設定しました。新しいパスワードでログインしてください。</p>
       ) : null}
       <form onSubmit={handleSubmit} className="flex flex-col gap-4 max-w-sm" noValidate>
         <label className="flex flex-col gap-1">
@@ -103,7 +114,12 @@ function LoginForm() {
         </label>
 
         {requireCaptcha ? (
-          <CaptchaWidget answer={captchaAnswer} onAnswerChange={setCaptchaAnswer} onTokenChange={setCaptchaToken} />
+          <CaptchaWidget
+            key={captchaRound}
+            answer={captchaAnswer}
+            onAnswerChange={setCaptchaAnswer}
+            onTokenChange={setCaptchaToken}
+          />
         ) : null}
 
         {error ? (
