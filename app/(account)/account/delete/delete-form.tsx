@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { PasswordInput } from "@/app/_components/auth/PasswordInput";
+import { fetchWithSilentRefresh } from "@/lib/auth/silent-refresh";
 
 export function DeleteAccountForm() {
   const router = useRouter();
@@ -12,7 +13,7 @@ export function DeleteAccountForm() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
-    const res = await fetch("/api/account/delete", {
+    const res = await fetchWithSilentRefresh("/api/account/delete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password }),

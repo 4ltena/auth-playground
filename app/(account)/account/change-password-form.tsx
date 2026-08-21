@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { PasswordInput } from "@/app/_components/auth/PasswordInput";
+import { fetchWithSilentRefresh } from "@/lib/auth/silent-refresh";
 
 export function ChangePasswordForm() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -11,7 +12,7 @@ export function ChangePasswordForm() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setMessage(null);
-    const res = await fetch("/api/account/password", {
+    const res = await fetchWithSilentRefresh("/api/account/password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ currentPassword, newPassword }),
