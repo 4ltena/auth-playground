@@ -9,9 +9,14 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "node --env-file-if-exists=.env.local node_modules/@playwright/test/cli.js test",
+    "test:e2e": "node --env-file-if-exists=.env.test.local scripts/test-postgres.mjs e2e",
     "db:migrate": "node --env-file-if-exists=.env.local node_modules/.bin/prisma migrate dev",
-    "db:seed": "node --env-file-if-exists=.env.local --experimental-strip-types prisma/seed.ts"
+    "db:seed": "node --env-file-if-exists=.env.local --experimental-strip-types prisma/seed.ts",
+    "pretest": "node scripts/prepare-tests.mjs",
+    "pretest:watch": "node scripts/prepare-tests.mjs",
+    "postinstall": "prisma generate",
+    "db:deploy": "node --env-file-if-exists=.env.local node_modules/prisma/build/index.js migrate deploy",
+    "test:postgres": "node --env-file-if-exists=.env.test.local scripts/test-postgres.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
@@ -33,5 +38,8 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "server-only": "^0.0.1"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }

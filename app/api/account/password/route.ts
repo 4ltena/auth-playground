@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentUserFromRequest } from "@/lib/auth/current-user";
-import { findUserById, updatePassword } from "@/lib/data/user";
+import { findUserById } from "@/lib/data/user";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
-import { revokeAllRefreshTokensForUser, REFRESH_TOKEN_COOKIE } from "@/lib/auth/session";
+import { changePasswordAndRevoke } from "@/lib/auth/session";
 import { isSameOriginRequest } from "@/lib/http/origin-check";
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -29,14 +29,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "weak_password" }, { status: 400 });
   }
 
-  await updatePassword(user.id, await hashPassword(newPassword));
-
-  // Revoke every OTHER session, not the caller's own — a password change
-  // that force-logs-out the person who just typed the current password
-  // correctly would be a confusing self-inflicted lockout, not a security
-  // improvement.
-  const currentRefreshToken = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value;
-  await revokeAllRefreshTokensForUser(user.id, currentRefreshToken);
+  await changePasswordAndRevoke(user.id, await hashPassword(newPassword), currentUser.sid);
 
   return NextResponse.json({ ok: true });
 }

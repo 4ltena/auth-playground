@@ -56,13 +56,14 @@ export async function POST(request: Request) {
   await resetLoginAttempts(email);
   await recordLoginHistory({ userId: user.id, success: true, ipAddress: ip, userAgent });
 
-  const accessToken = await signAccessToken({ sub: user.id, email: user.email, role: user.role });
-  const { token: refreshToken, maxAgeSeconds } = await issueRefreshToken({
+  const { token: refreshToken, maxAgeSeconds, sessionId } = await issueRefreshToken({
     userId: user.id,
     rememberMe,
     userAgent,
     ipAddress: ip,
   });
+
+  const accessToken = await signAccessToken({ sub: user.id, sid: sessionId, email: user.email, role: user.role });
 
   const response = NextResponse.json({ ok: true });
   response.cookies.set(ACCESS_TOKEN_COOKIE, accessToken, {

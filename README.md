@@ -1,70 +1,102 @@
 # Auth Playground
 
-トークンベース認証（JWT）を軸に、認証・認可まわりのセキュリティ機能を一通り実装したNext.js製の学習用Webアプリです。`TakeshiWada1980/web-sec-playground-2` を技術構成の参考にし、`koedama` プロジェクトの基盤（Next.js設定・Tailwindデザイントークン等）をコピーして作りました。詳しい設計は `docs/superpowers/specs/2026-08-20-auth-playground-design.md` を参照してください（このリポジトリでは `docs/` は非公開・ローカル専用としています）。
+JWT認証、セッション管理、管理者による認可を操作しながら学ぶWebアプリです。Next.jsの画面とAPI、Prisma、Neon PostgreSQLで構成しています。
 
-> **開発メモ:** 本リポジトリは「1時間で全機能の骨格を通す」という時間制約のもとで一気に実装したプロトタイプとしてスタートしました。実装直後に走った自動セキュリティレビューの指摘（レートリミットのIP詐称バイパス、パスワードリセットのブルートフォース対策欠如、オープンリダイレクト、CAPTCHAリプレイなど）と、その後の全体レビューで見つかった重要な不具合（トークンローテーションの競合状態、パスワード変更時の自己ログアウトなど）はすべて対応済みです。認証コアのユニットテスト（74件）とPlaywrightによるE2Eテスト（signup→login→account→logout、秘密の質問によるパスワードリセット）も整備済みです。
+## 機能
 
-## 実装した機能
+- アカウント作成、ログイン、ログアウト、退会
+- パスワードの強度表示・確認入力・表示切り替え、ソフトウェアキーボード
+- パスワード変更と秘密の質問による再設定
+- アクティブなセッションの一覧・個別失効、ログイン履歴
+- ログイン状態の保持、ログインIDの自動入力
+- 管理者によるアカウント停止・解除、ログイン試行ロックの解除
 
-- トークンベース認証（JWTアクセストークン15分＋リフレッシュトークンのローテーション、`aud`クレームでCAPTCHAトークンと区別）
-- JWTの有効期限切れに対するサイレントリフレッシュ（`lib/auth/silent-refresh.ts`、401検知後に自動リトライ）
-- ログイン試行のレートリミット（メール単位、5回失敗でロック、3回失敗でCAPTCHA要求。IPは`X-Forwarded-For`で詐称できるため識別子には使わない）
-- 状態変更系APIのOrigin検証（`SameSite=Lax`クッキーと組み合わせたCSRF対策）
-- サインアップ時の確認用パスワード
-- サインアップ時のパスワード強度表示
-- パスワードの表示・非表示切り替え
-- パスワードの変更機能（変更時に他セッションを全失効）
-- サインアップ時のメールアドレスのリアルタイム重複チェック
-- CAPTCHA（サーバー生成SVGの歪み文字、外部サービス不使用）
-- 秘密の質問によるパスワードリセット
-- 現在アクティブなセッションの一覧表示と個別ログアウト
-- 「ログイン状態を保持する」（Remember me）チェックボックス
-- ログイン履歴の表示
-- 「次回からログインIDを自動入力する」チェックボックス
-- キーロガー対策のソフトウェアキーボード（クリック式、配置シャッフル）
-- 管理者によるユーザー一覧閲覧・アカウント停止/解除・ロック解除
-- アカウント削除（退会）
+アクセストークンは15分で期限切れになり、リフレッシュトークンは使用ごとに交換します。セッションの有効期限は通常1日、ログイン状態を保持する場合は30日で、交換しても延長しません。保護された画面とAPIではDBのセッション・アカウント状態・権限を照合するため、失効や利用停止は次の要求から反映されます。
 
-## 技術スタック
+ログインに3回失敗すると画像チャレンジを要求し、5回失敗すると5分間ロックします。画像チャレンジは2分間有効で、正誤にかかわらず送信後は再利用できません。パスワード変更と他セッションの失効、再設定と全セッションの失効は、それぞれ一つのDBトランザクションで処理します。
 
-- Next.js 16（App Router、`proxy.ts` によるルート保護）
-- TypeScript（strict）
-- Prisma + SQLite
-- `jose`（JWT）、`bcryptjs`（パスワードハッシュ）
-- Tailwind CSS 4
+## 実行・公開構成
 
-## セットアップ
+| 役割 | サービス |
+| --- | --- |
+| 画面・認証API | Next.js 16 / Vercel |
+| データベース | Prisma 6 / Neon PostgreSQL |
+| アプリへの入口ページ | GitHub Pages |
+
+認証Cookieはアプリと同じオリジンで使用し、`HttpOnly`、`SameSite=Lax`、本番では`Secure`を設定します。状態を変更するAPIではOriginも確認します。GitHub Pagesは入口ページを配信し、認証APIは実行しません。
+
+公開URLはデプロイ後の動作確認を経て案内します。
+
+## ローカルで実行する
+
+Node.js 24と、開発専用のPostgreSQLデータベースを用意します。Neonを使う場合は本番とは別のブランチを使用してください。
 
 ```bash
-npm install
-cp .env.local.example .env.local   # 既に用意済みならスキップ
-npm run db:migrate                 # Prismaマイグレーション
-npm run db:seed                    # 管理者アカウントを作成
+npm ci
+cp .env.local.example .env.local
+```
+
+`.env.local`に次を設定します。接続文字列と署名鍵はGitへ登録せず、`NEXT_PUBLIC_`付き変数にも設定しません。
+
+| 変数 | 内容 |
+| --- | --- |
+| `DATABASE_URL` | Neonのプール接続URL |
+| `DATABASE_URL_UNPOOLED` | 同じDBへの直接接続URL。マイグレーションに使用 |
+| `JWT_SECRET` | `openssl rand -hex 32`などで生成する固有の乱数 |
+| `NEXT_PUBLIC_SITE_URL` | ローカルでは`http://localhost:3000`、本番ではアプリのHTTPS URL |
+
+```bash
+npm run db:deploy
 npm run dev
 ```
 
-`npm run db:seed` は `admin@example.com` / `admin-password-123` の管理者アカウントを作成します（`ADMIN_EMAIL` / `ADMIN_PASSWORD` 環境変数で上書き可能）。
+DB構造を変更する場合は、開発専用DBで`npm run db:migrate`を実行します。初期のSQLite移行履歴は`prisma/legacy-sqlite/`に保管しています。既存SQLiteデータの自動移行は行いません。
+
+管理者が必要な場合は、`.env.local`に`ADMIN_EMAIL`と16文字以上の固有な`ADMIN_PASSWORD`を設定し、`npm run db:seed`を実行します。既定の管理者パスワードはありません。既存の一般ユーザーを管理者へ昇格させる処理も行いません。
 
 ## テスト
 
 ```bash
-npm run typecheck   # tsc --noEmit
-npm test            # Vitest ユニットテスト（74件）
-npm run test:e2e    # Playwright E2E（実際のdevサーバー・ブラウザに対して実行）
+npm run typecheck
+npm test
+npm run build
 ```
 
-`npm test`は`prisma/test.db`という別ファイルに対して動作し、開発用の`prisma/dev.db`とは分離されています。テスト用DBのマイグレーションは自動では適用されないため、初回は次を実行してください。
+`npm test`は専用のPrisma ClientとSQLite DBを`node_modules/.auth-playground-test/`に自動生成します。開発・本番の接続文字列は使用しません。この検証だけではPostgreSQL固有の制約や並行処理を保証できないため、CIではPostgreSQL 18でも同じテストを実行します。
+
+PostgreSQLとブラウザの検証には、空の使い捨てDB `auth_playground_test` を作成し、Git管理対象外の`.env.test.local`に設定します。
+
+```dotenv
+TEST_DATABASE_URL="postgresql://USER:PASSWORD@HOST/auth_playground_test?sslmode=require"
+TEST_DATABASE_HOST="HOST"
+```
 
 ```bash
-DATABASE_URL="file:./prisma/test.db" npx prisma migrate deploy
+npm run test:postgres
+npx playwright install chromium
+npm run test:e2e
 ```
 
-## 動作確認済みのフロー
+テストはデータを削除します。DB名と明示したホストが一致しない場合は開始しません。E2Eは専用ポート3107でサーバーを起動し、既存の開発サーバーを再利用しません。
 
-サインアップ→ログイン→セッション一覧／ログイン履歴の取得→サイレントリフレッシュ→ログアウト、秘密の質問によるパスワードリセット、レートリミット＋CAPTCHAの段階発動、Originヘッダー検証によるクロスオリジンリクエストの拒否を確認済みです（ユニットテスト・E2Eテストに加え、実行中のdevサーバーへの直接のAPI呼び出しでも検証しました）。
+## デプロイ
 
-## 既知の制限事項
+1. 空の本番Neon DBに`npm run db:deploy`でマイグレーションを適用します。
+2. Vercelにリポジトリを接続し、Node.js 24と前述の本番環境変数を設定します。プレビュー環境には本番DBの接続文字列を設定せず、検証用ブランチを使用します。
+3. Vercel上で登録・ログイン・失効・ログアウトを確認します。
+4. GitHub Pagesの配信元をGitHub Actionsに設定し、`Publish entry page`を実行します。`app_url`には確認済みのVercel HTTPS URLを入力します。
 
-- アクセストークンはJWTの署名検証のみで無効化を確認しないため、管理者によるアカウント停止や個別セッションのログアウトは、そのユーザーのアクセストークンが有効な間（最大15分）は即座には効きません。次回の`/api/auth/refresh`実行時に反映されます。
-- CAPTCHAはステートレスな署名付きトークンのため、有効期限（2分）内は同じトークン＋答えの組を再利用できます。有効期限を短くする緩和策のみ実施しており、サーバー側でのワンタイム化（jti管理）は未実装です。
-- サインアップ時のメール重複チェックAPI（`/api/auth/check-email`）と、パスワードリセットの質問取得API（`/api/auth/password-reset/verify-question`）には、登録済みメールアドレスを外部から特定できてしまうアカウント列挙対策を実装していません。
+`site/index.html`は入口ページのテンプレートです。ワークフローがURLを埋め込み、静的ファイルだけを配信します。
+
+## 学習用途での制限
+
+実在する個人情報や、他サービスと共通のパスワードを登録しないでください。本アプリは本番のID基盤を代替するものではありません。
+
+- 自作CAPTCHAのSVGは機械的に読み取れるため、ボット対策サービス相当の防御にはなりません。答えをトークンに含めず、一度しか使えない点を学ぶための実装です。
+- メールアドレスの重複確認と秘密の質問の取得は、登録の有無を公開します。メール所有者の確認、MFA、外部CAPTCHA、全体のアクセス量制限は実装していません。
+- 秘密の質問は推測される可能性があり、ソフトウェアキーボードは画面記録やブラウザ侵入を防ぎません。
+- API要求中に失効が確定した場合、既に認可を終えた処理までは巻き戻しません。
+
+## 参考
+
+- [web-sec-playground-2](https://github.com/TakeshiWada1980/web-sec-playground-2) — 技術構成の参考。

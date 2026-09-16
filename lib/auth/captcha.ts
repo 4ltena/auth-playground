@@ -1,26 +1,14 @@
 import "server-only";
-import { SignJWT, jwtVerify } from "jose";
-import { randomInt } from "node:crypto";
+import { prisma } from "@/lib/data/client";
+import { randomInt, randomBytes, createHmac } from "node:crypto";
 
 const CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous chars (I,O,0,1)
 const CAPTCHA_LENGTH = 5;
-// Short TTL is a partial mitigation for replay, not a fix: this token is a
-// stateless signed JWT, so the same token+answer pair is valid for every
-// request until it expires (no server-side "already used" tracking). A real
-// fix needs a server-side single-use store (e.g. record the JWT `jti` in the
-// DB on issue, delete-on-verify, reject already-consumed jti) — left as a
-// known gap, tracked in the SDD ledger, not implemented in this pass.
-const CAPTCHA_TTL_SECONDS = 2 * 60;
-
-// Shares JWT_SECRET with lib/auth/jwt.ts's access tokens — `aud` keeps the
-// two token kinds from being interchangeable (see the matching comment in
-// jwt.ts).
-const CAPTCHA_AUDIENCE = "auth-playground:captcha";
-
-function getSecretKey(): Uint8Array {
+const CAPTCHA_TTL_SECONDS = 120;
+function verifier(id: string, answer: string): string {
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error("JWT_SECRET is not set");
-  return new TextEncoder().encode(secret);
+  return createHmac("sha256", secret).update(`${id}:${answer.trim().toUpperCase()}`).digest("hex");
 }
 
 function randomText(): string {
@@ -50,23 +38,25 @@ function renderSvg(text: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="170" height="60" viewBox="0 0 170 60"><rect width="170" height="60" fill="#f3f3f3"/>${noiseLines}${glyphs}</svg>`;
 }
 
+// Educational SVG challenge: the image is machine-readable, not a bot-defense service.
 export async function generateCaptcha(): Promise<{ svg: string; token: string }> {
   const text = randomText();
-  const token = await new SignJWT({ answer: text })
-    .setProtectedHeader({ alg: "HS256" })
-    .setAudience(CAPTCHA_AUDIENCE)
-    .setIssuedAt()
-    .setExpirationTime(`${CAPTCHA_TTL_SECONDS}s`)
-    .sign(getSecretKey());
+  const token = randomBytes(32).toString("hex");
+  await prisma.captchaChallenge.deleteMany({ where: { expiresAt: { lte: new Date() } } });
+  await prisma.captchaChallenge.create({ data: {
+    id: token, answerVerifier: verifier(token, text), expiresAt: new Date(Date.now() + CAPTCHA_TTL_SECONDS * 1000),
+  } });
   return { svg: renderSvg(text), token };
 }
 
 export async function verifyCaptcha(token: string, answer: string): Promise<boolean> {
-  try {
-    const { payload } = await jwtVerify(token, getSecretKey(), { audience: CAPTCHA_AUDIENCE });
-    if (typeof payload.answer !== "string") return false;
-    return payload.answer.toUpperCase() === answer.trim().toUpperCase();
-  } catch {
-    return false;
-  }
+  if (!/^[a-f0-9]{64}$/.test(token)) return false;
+  // Every submitted challenge is single-use, including incorrect answers.
+  const result = await prisma.captchaChallenge.updateMany({
+    where: { id: token, consumedAt: null, expiresAt: { gt: new Date() } },
+    data: { consumedAt: new Date() },
+  });
+  if (!result.count) return false;
+  const record = await prisma.captchaChallenge.findUnique({ where: { id: token } });
+  return record?.answerVerifier === verifier(token, answer);
 }

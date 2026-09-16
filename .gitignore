@@ -17,6 +17,8 @@ GEMINI.md
 /.superpowers/
 
 .env.local
+.env.test.local
+.vercel/
 
 # SQLite dev/test databases
 prisma/*.db

@@ -1,15 +1,21 @@
 import { defineConfig } from "vitest/config";
 
+const postgres = process.env.AUTH_TEST_POSTGRES === "1";
+if (postgres) {
+  const url = new URL(process.env.DATABASE_URL ?? "invalid");
+  if (url.pathname !== "/auth_playground_test" || url.hostname !== process.env.TEST_DATABASE_HOST) {
+    throw new Error("Refusing to run destructive tests outside the explicitly named test database.");
+  }
+}
+
 export default defineConfig({
   test: {
     // Also matches root-level test files (e.g. proxy.test.ts).
     include: ["lib/**/*.test.ts", "app/**/*.test.ts", "*.test.ts"],
     env: {
       JWT_SECRET: "test-secret-at-least-32-bytes-long-000000",
-      // Relative to prisma/schema.prisma's directory, not the cwd — this
-      // resolves to prisma/test.db, not prisma/prisma/test.db (see the same
-      // gotcha noted in .env.local for DATABASE_URL).
-      DATABASE_URL: "file:./test.db",
+      // Always the isolated generated test client and local test database.
+      DATABASE_URL: postgres ? process.env.DATABASE_URL! : `file:${new URL("./node_modules/.auth-playground-test/unit.db", import.meta.url).pathname}`,
     },
     // Every DB-touching test file's afterEach does an unscoped deleteMany()
     // (simplest way to keep each test isolated within its own file). Running
@@ -21,6 +27,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      ...(postgres ? {} : { "@prisma/client": new URL("./node_modules/.auth-playground-test/client/index.js", import.meta.url).pathname }),
       "@": new URL(".", import.meta.url).pathname,
       // Next.js handles `import "server-only"` itself at build time and never runs
       // the npm package's own code (see node_modules/next/dist/docs/01-app/02-guides/

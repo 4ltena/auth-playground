@@ -1,9 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { SignJWT } from "jose";
 import { signAccessToken, verifyAccessToken, type AccessTokenPayload } from "./jwt";
 
+afterEach(() => vi.unstubAllEnvs());
+
 describe("JWT access tokens", () => {
-  const payload: AccessTokenPayload = { sub: "user-1", email: "a@example.com", role: "USER" };
+  const payload: AccessTokenPayload = { sub: "user-1", sid: "session-1", email: "a@example.com", role: "USER" };
+
+  it("refuses example or short signing secrets in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    for (const value of ["short", "replace-with-a-random-secret-at-least-32-characters"]) {
+      vi.stubEnv("JWT_SECRET", value);
+      await expect(signAccessToken(payload)).rejects.toThrow("JWT_SECRET");
+    }
+  });
 
   it("signs and verifies a valid token", async () => {
     const token = await signAccessToken(payload);

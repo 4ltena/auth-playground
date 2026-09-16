@@ -21,13 +21,9 @@ describe("isSameOriginRequest", () => {
     expect(isSameOriginRequest(request)).toBe(false);
   });
 
-  it("documents that scheme is not part of the comparison (URL().host excludes it)", () => {
-    // A cross-scheme Origin (http vs https) on the same host:port currently
-    // passes — browsers set Origin from the real request scheme and never
-    // let script forge it, so this isn't attacker-controllable in practice,
-    // but it's worth pinning down explicitly rather than leaving it implicit.
+  it("rejects a different scheme on the same host", () => {
     const request = makeRequest({ origin: "https://localhost:3000", host: "localhost:3000" });
-    expect(isSameOriginRequest(request)).toBe(true);
+    expect(isSameOriginRequest(request)).toBe(false);
   });
 
   it("allows a missing Origin header (non-browser clients, some same-origin navigations)", () => {

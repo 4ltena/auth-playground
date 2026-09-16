@@ -147,7 +147,7 @@ export default function SignupPage() {
           />
         </label>
 
-        <CaptchaWidget answer={captchaAnswer} onAnswerChange={setCaptchaAnswer} onTokenChange={setCaptchaToken} />
+        <CaptchaWidget key={captchaRound} answer={captchaAnswer} onAnswerChange={setCaptchaAnswer} onTokenChange={setCaptchaToken} />
 
         {error ? (
           <p role="alert" className="text-[0.85rem] text-stop">

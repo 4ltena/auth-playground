@@ -20,20 +20,16 @@ export async function POST(request: NextRequest) {
   const rotated = await rotateRefreshToken(refreshToken);
   if (!rotated) {
     const response = NextResponse.json({ error: "invalid_refresh_token" }, { status: 401 });
-    response.cookies.delete(ACCESS_TOKEN_COOKIE);
-    response.cookies.delete(REFRESH_TOKEN_COOKIE);
     return response;
   }
 
   const user = await findUserById(rotated.userId);
   if (!user || user.status === "SUSPENDED") {
     const response = NextResponse.json({ error: "account_unavailable" }, { status: 401 });
-    response.cookies.delete(ACCESS_TOKEN_COOKIE);
-    response.cookies.delete(REFRESH_TOKEN_COOKIE);
     return response;
   }
 
-  const accessToken = await signAccessToken({ sub: user.id, email: user.email, role: user.role });
+  const accessToken = await signAccessToken({ sub: user.id, sid: rotated.sessionId, email: user.email, role: user.role });
 
   const response = NextResponse.json({ ok: true });
   response.cookies.set(ACCESS_TOKEN_COOKIE, accessToken, {

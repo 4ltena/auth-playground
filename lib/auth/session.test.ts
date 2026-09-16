@@ -34,10 +34,10 @@ describe("issueRefreshToken", () => {
     const user = await createTestUser("a@example.com");
     const { token } = await issueRefreshToken({ userId: user.id, rememberMe: false });
 
-    const records = await prisma.refreshToken.findMany({ where: { userId: user.id } });
+    const records = await prisma.refreshToken.findMany({ where: { session: { userId: user.id } } });
     expect(records).toHaveLength(1);
     expect(records[0]?.tokenHash).not.toBe(token);
-    expect(records[0]?.revokedAt).toBeNull();
+    expect(records[0]?.consumedAt).toBeNull();
   });
 });
 
@@ -52,12 +52,12 @@ describe("rotateRefreshToken", () => {
     expect(rotated?.token).not.toBe(token);
 
     const records = await prisma.refreshToken.findMany({
-      where: { userId: user.id },
+      where: { session: { userId: user.id } },
       orderBy: { createdAt: "asc" },
     });
     expect(records).toHaveLength(2);
-    expect(records[0]?.revokedAt).not.toBeNull(); // old one revoked
-    expect(records[1]?.revokedAt).toBeNull(); // new one active
+    expect(records[0]?.consumedAt).not.toBeNull(); // old one revoked
+    expect(records[1]?.consumedAt).toBeNull(); // new one active
   });
 
   it("returns null for an unknown token", async () => {
@@ -77,7 +77,7 @@ describe("rotateRefreshToken", () => {
     const { token } = await issueRefreshToken({ userId: user.id, rememberMe: false });
     // Back-date expiresAt directly, simulating a token past its TTL.
     await prisma.refreshToken.updateMany({
-      where: { userId: user.id },
+      where: { session: { userId: user.id } },
       data: { expiresAt: new Date(Date.now() - 1000) },
     });
 
@@ -98,7 +98,7 @@ describe("rotateRefreshToken", () => {
 
     // Exactly one new active token exists (the original is revoked by both
     // attempts hitting the same row, but only one issues a successor).
-    const activeCount = await prisma.refreshToken.count({ where: { userId: user.id, revokedAt: null } });
+    const activeCount = await prisma.refreshToken.count({ where: { session: { userId: user.id, revokedAt: null }, consumedAt: null } });
     expect(activeCount).toBe(1);
   });
 });
@@ -111,7 +111,7 @@ describe("revokeAllRefreshTokensForUser", () => {
 
     await revokeAllRefreshTokensForUser(user.id);
 
-    const activeCount = await prisma.refreshToken.count({ where: { userId: user.id, revokedAt: null } });
+    const activeCount = await prisma.refreshToken.count({ where: { session: { userId: user.id, revokedAt: null }, consumedAt: null } });
     expect(activeCount).toBe(0);
   });
 
@@ -122,7 +122,7 @@ describe("revokeAllRefreshTokensForUser", () => {
 
     await revokeAllRefreshTokensForUser(user.id, keep);
 
-    const active = await prisma.refreshToken.findMany({ where: { userId: user.id, revokedAt: null } });
+    const active = await prisma.refreshToken.findMany({ where: { session: { userId: user.id, revokedAt: null }, consumedAt: null } });
     expect(active).toHaveLength(1);
 
     // The surviving one really is the caller's own session, not just any one.
@@ -138,7 +138,7 @@ describe("revokeAllRefreshTokensForUser", () => {
 
     await revokeAllRefreshTokensForUser(userA.id);
 
-    const bActive = await prisma.refreshToken.count({ where: { userId: userB.id, revokedAt: null } });
+    const bActive = await prisma.refreshToken.count({ where: { session: { userId: userB.id, revokedAt: null }, consumedAt: null } });
     expect(bActive).toBe(1);
   });
 });
@@ -151,11 +151,11 @@ describe("listActiveSessions", () => {
     await revokeRefreshToken(toRevoke);
 
     await issueRefreshToken({ userId: user.id, rememberMe: false });
-    const expiredRecord = await prisma.refreshToken.findFirst({
+    const expiredRecord = await prisma.session.findFirst({
       where: { userId: user.id, revokedAt: null },
       orderBy: { createdAt: "desc" },
     });
-    await prisma.refreshToken.update({
+    await prisma.session.update({
       where: { id: expiredRecord!.id },
       data: { expiresAt: new Date(Date.now() - 1000) },
     });
@@ -171,11 +171,11 @@ describe("revokeSessionById", () => {
   it("returns true and revokes when the session belongs to the user", async () => {
     const user = await createTestUser("k@example.com");
     await issueRefreshToken({ userId: user.id, rememberMe: false });
-    const [session] = await prisma.refreshToken.findMany({ where: { userId: user.id } });
+    const [session] = await prisma.session.findMany({ where: { userId: user.id } });
     if (!session) throw new Error("expected a session to have been created");
 
     await expect(revokeSessionById(user.id, session.id)).resolves.toBe(true);
-    const reloaded = await prisma.refreshToken.findUnique({ where: { id: session.id } });
+    const reloaded = await prisma.session.findUnique({ where: { id: session.id } });
     expect(reloaded?.revokedAt).not.toBeNull();
   });
 
@@ -183,11 +183,11 @@ describe("revokeSessionById", () => {
     const owner = await createTestUser("l@example.com");
     const attacker = await createTestUser("m@example.com");
     await issueRefreshToken({ userId: owner.id, rememberMe: false });
-    const [session] = await prisma.refreshToken.findMany({ where: { userId: owner.id } });
+    const [session] = await prisma.session.findMany({ where: { userId: owner.id } });
     if (!session) throw new Error("expected a session to have been created");
 
     await expect(revokeSessionById(attacker.id, session.id)).resolves.toBe(false);
-    const reloaded = await prisma.refreshToken.findUnique({ where: { id: session.id } });
+    const reloaded = await prisma.session.findUnique({ where: { id: session.id } });
     expect(reloaded?.revokedAt).toBeNull();
   });
 

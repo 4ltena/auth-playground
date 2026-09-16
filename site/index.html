@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Auth Playground</title>
+<meta name="description" content="認証・セッション管理・権限の仕組みを試せる学習用Webアプリ。">
+<style>
+:root{color-scheme:light;font-family:system-ui,sans-serif;background:#f5f4ef;color:#242521}body{margin:0}main{max-width:760px;margin:10vh auto;padding:32px}small{letter-spacing:.16em;color:#506b53}h1{font-size:clamp(2.5rem,7vw,4rem);line-height:1.05;letter-spacing:-.04em}p,li{line-height:1.9}a{color:inherit}.launch{display:inline-block;background:#334d37;color:white;padding:14px 24px;border-radius:8px;text-decoration:none;margin:16px 0}a:focus-visible{outline:3px solid #bb7335;outline-offset:4px}footer{margin-top:48px;border-top:1px solid #d4d5cc;padding-top:20px;font-size:.85rem}
+</style>
+</head>
+<body><main>
+<small>AUTHENTICATION / LEARNING LAB</small>
+<h1>Auth Playground</h1>
+<p>アカウントの作成からログイン、セッションの失効まで。認証と権限管理の仕組みを、操作しながら学ぶためのWebアプリです。</p>
+<a class="launch" href="{{APP_URL}}">アプリを開く</a>
+<ul><li>JWTとCookieによるログイン</li><li>セッション一覧と個別ログアウト</li><li>パスワード変更・再設定と管理者による利用停止</li></ul>
+<p>学習用の公開デモです。実在する個人情報や、ほかのサービスで使用しているパスワードは登録しないでください。自作CAPTCHAと秘密の質問には実運用上の制限があります。</p>
+<footer>このページはGitHub Pages、アプリ本体はVercel、データベースはNeonで稼働します。<br><a href="https://github.com/4ltena/auth-playground">ソースコードとセットアップ手順</a></footer>
+</main></body></html>

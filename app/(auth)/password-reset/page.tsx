@@ -14,6 +14,7 @@ export default function PasswordResetPage() {
   const [newPassword, setNewPassword] = useState("");
   const [requireCaptcha, setRequireCaptcha] = useState(false);
   const [captchaAnswer, setCaptchaAnswer] = useState("");
+  const [captchaRound, setCaptchaRound] = useState(0);
   const [captchaToken, setCaptchaToken] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +45,8 @@ export default function PasswordResetPage() {
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
+      setCaptchaRound((round) => round + 1);
+      setCaptchaAnswer("");
       if (data.requireCaptcha) setRequireCaptcha(true);
       setError(
         data.error === "answer_mismatch"
@@ -102,7 +105,7 @@ export default function PasswordResetPage() {
             showStrength
           />
           {requireCaptcha ? (
-            <CaptchaWidget answer={captchaAnswer} onAnswerChange={setCaptchaAnswer} onTokenChange={setCaptchaToken} />
+            <CaptchaWidget key={captchaRound} answer={captchaAnswer} onAnswerChange={setCaptchaAnswer} onTokenChange={setCaptchaToken} />
           ) : null}
           {error ? (
             <p role="alert" className="text-[0.85rem] text-stop">
