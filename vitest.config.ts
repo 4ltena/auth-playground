@@ -10,6 +10,9 @@ if (postgres) {
 
 export default defineConfig({
   test: {
+    // Remote Neon integration checks include network round trips; assertions are unchanged.
+    testTimeout: postgres ? 30_000 : 5_000,
+    hookTimeout: postgres ? 30_000 : 10_000,
     // Also matches root-level test files (e.g. proxy.test.ts).
     include: ["lib/**/*.test.ts", "app/**/*.test.ts", "*.test.ts"],
     env: {
