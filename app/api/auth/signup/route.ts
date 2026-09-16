@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { hashPassword } from "@/lib/auth/password";
-import { createUser, findUserByEmail } from "@/lib/data/user";
-import { setSecurityQuestion } from "@/lib/data/securityQuestion";
+import { findUserByEmail } from "@/lib/data/user";
+import { prisma } from "@/lib/data/client";
 import { isSecurityQuestionKey } from "@/lib/auth/securityQuestions";
 import { verifyCaptcha } from "@/lib/auth/captcha";
 import { isSameOriginRequest } from "@/lib/http/origin-check";
@@ -45,10 +45,17 @@ export async function POST(request: Request) {
   }
 
   const passwordHash = await hashPassword(password);
-  const user = await createUser({ email, passwordHash });
-
   const answerHash = await hashPassword(securityAnswer.trim().toLowerCase());
-  await setSecurityQuestion({ userId: user.id, questionKey: securityQuestionKey, answerHash });
+  try {
+    await prisma.user.create({ data: { email, passwordHash,
+      securityQuestions: { create: { questionKey: securityQuestionKey, answerHash } },
+    } });
+  } catch (error) {
+    if (typeof error === "object" && error && "code" in error && error.code === "P2002") {
+      return NextResponse.json({ error: "email_taken" }, { status: 409 });
+    }
+    throw error;
+  }
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }

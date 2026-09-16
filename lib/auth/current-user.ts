@@ -3,19 +3,17 @@ import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { ACCESS_TOKEN_COOKIE, verifyAccessToken, type AccessTokenPayload } from "./jwt";
 
-// This checks the JWT signature only — it does NOT hit the DB, by design
-// (proxy.ts calls this same verification path and must stay Edge-compatible
-// / DB-free). Known consequence: admin suspend and per-session logout are
-// NOT instant. A suspended or logged-out-elsewhere user's still-valid access
-// token keeps working for up to its remaining TTL (ACCESS_TOKEN_MAX_AGE,
-// currently 15 min) — only /api/auth/refresh re-checks user.status, so
-// revocation becomes effective the next time that user's token is refreshed
-// or expires. Accepted tradeoff for a stateless-JWT design; a stricter
-// version would look up the session (and user.status) on every request,
-// which trades this file's simplicity for a DB round-trip per request.
+import { prisma } from "@/lib/data/client";
+
 async function resolveCurrentUser(token: string | undefined): Promise<AccessTokenPayload | null> {
   if (!token) return null;
-  return verifyAccessToken(token);
+  const payload = await verifyAccessToken(token);
+  if (!payload) return null;
+  const session = await prisma.session.findUnique({ where: { id: payload.sid }, include: { user: true } });
+  if (!session || session.userId !== payload.sub || session.revokedAt ||
+      session.expiresAt <= new Date() || session.user.status !== "ACTIVE") return null;
+  // Role changes take effect immediately, even while an old JWT is valid.
+  return { sub: session.userId, sid: session.id, email: session.user.email, role: session.user.role };
 }
 
 // For Server Components / Server Actions, where next/headers' cookies() is

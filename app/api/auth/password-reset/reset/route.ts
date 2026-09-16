@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { findUserByEmail, updatePassword } from "@/lib/data/user";
+import { findUserByEmail } from "@/lib/data/user";
 import { findSecurityQuestionByUserId } from "@/lib/data/securityQuestion";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
-import { revokeAllRefreshTokensForUser } from "@/lib/auth/session";
+import { changePasswordAndRevoke } from "@/lib/auth/session";
 import { checkLoginAttempt, recordLoginFailure, resetLoginAttempts } from "@/lib/auth/rateLimit";
 import { verifyCaptcha } from "@/lib/auth/captcha";
 import { isSameOriginRequest } from "@/lib/http/origin-check";
@@ -51,8 +51,7 @@ export async function POST(request: Request) {
   }
 
   await resetLoginAttempts(email);
-  await updatePassword(user.id, await hashPassword(newPassword));
-  await revokeAllRefreshTokensForUser(user.id);
+  await changePasswordAndRevoke(user.id, await hashPassword(newPassword));
 
   return NextResponse.json({ ok: true });
 }

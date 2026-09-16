@@ -18,7 +18,7 @@ const FAILURE_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 // rotating the header, defeating the limiter entirely. IP is still recorded
 // in LoginHistory for visibility, just not used as a bypassable lock key.
 function makeIdentifier(email: string): string {
-  return email;
+  return email.trim().toLowerCase();
 }
 
 function isStale(lastAttemptAt: Date): boolean {
@@ -47,15 +47,20 @@ export async function recordLoginFailure(email: string) {
   if (!email) return;
 
   const identifier = makeIdentifier(email);
-  const existing = await prisma.loginAttempt.findUnique({ where: { identifier } });
-  const baseline = existing && !isStale(existing.lastAttemptAt) ? existing.failedCount : 0;
-  const failedCount = baseline + 1;
-  const lockedUntil = failedCount >= MAX_FAILED_ATTEMPTS ? new Date(Date.now() + LOCK_DURATION_MS) : null;
-
-  await prisma.loginAttempt.upsert({
-    where: { identifier },
-    create: { identifier, failedCount, lockedUntil, lastAttemptAt: new Date() },
-    update: { failedCount, lockedUntil, lastAttemptAt: new Date() },
+  const now = new Date();
+  await prisma.$transaction(async (tx) => {
+    await tx.loginAttempt.updateMany({
+      where: { identifier, lastAttemptAt: { lt: new Date(now.getTime() - FAILURE_WINDOW_MS) } },
+      data: { failedCount: 0 },
+    });
+    const record = await tx.loginAttempt.upsert({
+      where: { identifier },
+      create: { identifier, failedCount: 1, lastAttemptAt: now },
+      update: { failedCount: { increment: 1 }, lastAttemptAt: now },
+    });
+    if (record.failedCount >= MAX_FAILED_ATTEMPTS && (!record.lockedUntil || record.lockedUntil <= now)) {
+      await tx.loginAttempt.update({ where: { identifier }, data: { lockedUntil: new Date(now.getTime() + LOCK_DURATION_MS) } });
+    }
   });
 }
 

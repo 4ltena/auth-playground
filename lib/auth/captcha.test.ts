@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { SignJWT } from "jose";
 import { generateCaptcha, verifyCaptcha } from "./captcha";
+
+import { prisma } from "@/lib/data/client";
+afterEach(() => prisma.captchaChallenge.deleteMany());
 
 function decodeAnswerFromSvg(svg: string): string {
   const chars = [...svg.matchAll(/<text[^>]*>([A-Z0-9])<\/text>/g)].map((m) => m[1]);
@@ -9,12 +12,25 @@ function decodeAnswerFromSvg(svg: string): string {
 
 describe("CAPTCHA", () => {
   it("verifies the correct answer (case-insensitive, trims whitespace)", async () => {
-    const { svg, token } = await generateCaptcha();
-    const answer = decodeAnswerFromSvg(svg);
+    for (const transform of [(s: string) => s, (s: string) => s.toLowerCase(), (s: string) => `  ${s}  `]) {
+      const { svg, token } = await generateCaptcha();
+      const answer = transform(decodeAnswerFromSvg(svg));
+      await expect(verifyCaptcha(token, answer)).resolves.toBe(true);
+      await expect(verifyCaptcha(token, answer)).resolves.toBe(false);
+    }
+  });
 
-    await expect(verifyCaptcha(token, answer)).resolves.toBe(true);
-    await expect(verifyCaptcha(token, answer.toLowerCase())).resolves.toBe(true);
-    await expect(verifyCaptcha(token, `  ${answer}  `)).resolves.toBe(true);
+  it("allows only one concurrent successful verification", async () => {
+    const { token, svg } = await generateCaptcha();
+    const answer = decodeAnswerFromSvg(svg);
+    const results = await Promise.all([verifyCaptcha(token, answer), verifyCaptcha(token, answer)]);
+    expect(results.filter(Boolean)).toHaveLength(1);
+  });
+
+  it("rejects expired challenges", async () => {
+    const { token, svg } = await generateCaptcha();
+    await prisma.captchaChallenge.update({ where: { id: token }, data: { expiresAt: new Date(0) } });
+    expect(await verifyCaptcha(token, decodeAnswerFromSvg(svg))).toBe(false);
   });
 
   it("rejects a wrong answer", async () => {

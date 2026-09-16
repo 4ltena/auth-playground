@@ -1,6 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
 
 async function solveCaptcha(page: Page) {
+  await expect(page.getByRole("button", { name: "再表示" })).toBeEnabled();
+  await expect(page.locator("svg text")).toHaveCount(5);
   const texts = await page.locator("svg text").allTextContents();
   await page.getByLabel("画像の文字を入力してください").fill(texts.join(""));
 }

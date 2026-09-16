@@ -37,6 +37,11 @@ describe("checkLoginAttempt / recordLoginFailure", () => {
     await expect(checkLoginAttempt(email)).resolves.toMatchObject({ locked: true });
   });
 
+  it("counts concurrent failures without losing increments", async () => {
+    await Promise.all(Array.from({ length: 5 }, () => recordLoginFailure("race@example.com")));
+    expect(await checkLoginAttempt("race@example.com")).toMatchObject({ failedCount: 5, locked: true });
+  });
+
   it("does not touch a bucket for an empty email", async () => {
     await recordLoginFailure("");
     await expect(checkLoginAttempt("")).resolves.toEqual({ locked: false, requireCaptcha: false, failedCount: 0 });

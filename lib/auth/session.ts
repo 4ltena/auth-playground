@@ -1,109 +1,91 @@
 import "server-only";
 import { randomBytes, createHash } from "node:crypto";
 import { prisma } from "@/lib/data/client";
+import type { Prisma } from "@prisma/client";
 
 export const REFRESH_TOKEN_COOKIE = "refresh_token";
-const REFRESH_TOKEN_TTL_REMEMBER_SECONDS = 30 * 24 * 60 * 60; // 30 days
-const REFRESH_TOKEN_TTL_DEFAULT_SECONDS = 24 * 60 * 60; // 1 day
-
-function hashToken(token: string): string {
+function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
-
 export function refreshTokenMaxAge(rememberMe: boolean): number {
-  return rememberMe ? REFRESH_TOKEN_TTL_REMEMBER_SECONDS : REFRESH_TOKEN_TTL_DEFAULT_SECONDS;
+  return (rememberMe ? 30 : 1) * 24 * 60 * 60;
 }
-
 export async function issueRefreshToken(input: {
-  userId: string;
-  rememberMe: boolean;
-  userAgent?: string | null;
-  ipAddress?: string | null;
+  userId: string; rememberMe: boolean; userAgent?: string | null; ipAddress?: string | null;
 }) {
   const token = randomBytes(32).toString("hex");
   const maxAgeSeconds = refreshTokenMaxAge(input.rememberMe);
-  await prisma.refreshToken.create({
-    data: {
-      userId: input.userId,
-      tokenHash: hashToken(token),
-      rememberMe: input.rememberMe,
-      userAgent: input.userAgent ?? null,
-      ipAddress: input.ipAddress ?? null,
-      expiresAt: new Date(Date.now() + maxAgeSeconds * 1000),
-    },
-  });
-  return { token, maxAgeSeconds };
+  const expiresAt = new Date(Date.now() + maxAgeSeconds * 1000);
+  const session = await prisma.session.create({ data: {
+    ...input, expiresAt,
+    refreshTokens: { create: { tokenHash: hashToken(token), expiresAt } },
+  } });
+  return { token, maxAgeSeconds, sessionId: session.id };
 }
 
-// Verifies a refresh token and rotates it (old one revoked, new one issued).
-// Returns null if the token is missing, expired, or already revoked.
-//
-// The revoke step is a conditional updateMany (revokedAt: null in the WHERE,
-// not just the SELECT) so two concurrent calls with the same token can't
-// both win: only the request whose update actually flips a row from
-// null->revoked gets to issue a new token. Without this, a find-then-update
-// race lets both callers see revokedAt: null before either write lands,
-// producing two live refresh tokens from one rotation (breaks the
-// single-active-chain invariant and any future reuse-detection built on it).
+// The conditional consume and successor creation commit together. Session expiry
+// is absolute: repeated refreshes cannot extend a stolen session indefinitely.
 export async function rotateRefreshToken(token: string) {
-  const tokenHash = hashToken(token);
-  const record = await prisma.refreshToken.findUnique({ where: { tokenHash } });
-
-  if (!record || record.revokedAt || record.expiresAt < new Date()) return null;
-
-  const { count } = await prisma.refreshToken.updateMany({
-    where: { id: record.id, revokedAt: null },
-    data: { revokedAt: new Date() },
+  return prisma.$transaction(async (tx) => {
+    const now = new Date();
+    const record = await tx.refreshToken.findUnique({
+      where: { tokenHash: hashToken(token) }, include: { session: { include: { user: true } } },
+    });
+    if (!record || record.consumedAt || record.expiresAt <= now ||
+        record.session.revokedAt || record.session.expiresAt <= now || record.session.user.status !== "ACTIVE") return null;
+    // Serialize against session revocation before consuming a token.
+    const active = await tx.session.updateMany({
+      where: { id: record.sessionId, revokedAt: null, expiresAt: { gt: now } },
+      data: { lastUsedAt: now },
+    });
+    if (!active.count) return null;
+    const consumed = await tx.refreshToken.updateMany({
+      where: { id: record.id, consumedAt: null, expiresAt: { gt: now } }, data: { consumedAt: now },
+    });
+    if (!consumed.count) return null;
+    const next = randomBytes(32).toString("hex");
+    await tx.refreshToken.create({ data: {
+      sessionId: record.sessionId, tokenHash: hashToken(next), expiresAt: record.session.expiresAt,
+    } });
+    return { userId: record.session.userId, sessionId: record.sessionId, token: next,
+      maxAgeSeconds: Math.max(0, Math.floor((record.session.expiresAt.getTime() - Date.now()) / 1000)) };
   });
-  if (count === 0) return null; // lost the race to a concurrent rotation/revoke
-
-  const next = await issueRefreshToken({
-    userId: record.userId,
-    rememberMe: record.rememberMe,
-    userAgent: record.userAgent,
-    ipAddress: record.ipAddress,
-  });
-
-  return { userId: record.userId, ...next };
 }
 
 export async function revokeRefreshToken(token: string) {
-  const tokenHash = hashToken(token);
-  await prisma.refreshToken.updateMany({
-    where: { tokenHash, revokedAt: null },
+  const record = await prisma.refreshToken.findUnique({ where: { tokenHash: hashToken(token) } });
+  if (record) await prisma.session.updateMany({
+    where: { id: record.sessionId, revokedAt: null }, data: { revokedAt: new Date() },
+  });
+}
+
+export async function revokeAllRefreshTokensForUser(userId: string, exceptToken?: string) {
+  const record = exceptToken ? await prisma.refreshToken.findUnique({ where: { tokenHash: hashToken(exceptToken) } }) : null;
+  await revokeUserSessions(prisma, userId, record?.sessionId);
+}
+
+export async function revokeUserSessions(tx: Prisma.TransactionClient, userId: string, exceptSessionId?: string) {
+  await tx.session.updateMany({
+    where: { userId, revokedAt: null, ...(exceptSessionId ? { id: { not: exceptSessionId } } : {}) },
     data: { revokedAt: new Date() },
   });
 }
 
-// `exceptToken`: pass the caller's own current refresh token to exclude it
-// from revocation ("log out every OTHER device" — password change and
-// security-question reset both mean this, not "also log the requester out").
-export async function revokeAllRefreshTokensForUser(userId: string, exceptToken?: string) {
-  const exceptTokenHash = exceptToken ? hashToken(exceptToken) : undefined;
-  await prisma.refreshToken.updateMany({
-    where: {
-      userId,
-      revokedAt: null,
-      ...(exceptTokenHash ? { tokenHash: { not: exceptTokenHash } } : {}),
-    },
-    data: { revokedAt: new Date() },
+export async function changePasswordAndRevoke(userId: string, passwordHash: string, exceptSessionId?: string) {
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: userId }, data: { passwordHash } });
+    await revokeUserSessions(tx, userId, exceptSessionId);
   });
 }
 
 export async function listActiveSessions(userId: string) {
-  return prisma.refreshToken.findMany({
-    where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
-    orderBy: { lastUsedAt: "desc" },
+  return prisma.session.findMany({
+    where: { userId, revokedAt: null, expiresAt: { gt: new Date() } }, orderBy: { lastUsedAt: "desc" },
   });
 }
-
-// Returns whether a session was actually revoked, so the caller can tell
-// "you logged out your own device" from "that id doesn't belong to you /
-// doesn't exist" instead of reporting success either way.
 export async function revokeSessionById(userId: string, sessionId: string): Promise<boolean> {
-  const { count } = await prisma.refreshToken.updateMany({
-    where: { id: sessionId, userId, revokedAt: null },
-    data: { revokedAt: new Date() },
+  const { count } = await prisma.session.updateMany({
+    where: { id: sessionId, userId, revokedAt: null }, data: { revokedAt: new Date() },
   });
   return count > 0;
 }

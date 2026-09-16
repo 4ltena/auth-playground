@@ -16,7 +16,7 @@ export function isSameOriginRequest(request: Request): boolean {
   if (!host) return false;
 
   try {
-    return new URL(origin).host === host;
+    return new URL(origin).origin === new URL(request.url).origin && new URL(origin).host === host;
   } catch {
     return false;
   }
