@@ -25,7 +25,7 @@ JWT認証、セッション管理、管理者による認可を操作しなが�
 
 認証Cookieはアプリと同じオリジンで使用し、`HttpOnly`、`SameSite=Lax`、本番では`Secure`を設定します。状態を変更するAPIではOriginも確認します。GitHub Pagesは入口ページを配信し、認証APIは実行しません。
 
-公開URLはデプロイ後の動作確認を経て案内します。
+[公開アプリを開く](https://auth-playground-six.vercel.app/)
 
 ## ローカルで実行する
 
