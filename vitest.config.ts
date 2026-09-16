@@ -14,8 +14,8 @@ export default defineConfig({
     include: ["lib/**/*.test.ts", "app/**/*.test.ts", "*.test.ts"],
     env: {
       JWT_SECRET: "test-secret-at-least-32-bytes-long-000000",
-      // Always the isolated generated test client and local test database.
-      DATABASE_URL: postgres ? process.env.DATABASE_URL! : `file:${new URL("./node_modules/.auth-playground-test/unit.db", import.meta.url).pathname}`,
+      // SQLite has one writer; PostgreSQL CI separately tests actual concurrent transactions.
+      DATABASE_URL: postgres ? process.env.DATABASE_URL! : `file:${new URL("./node_modules/.auth-playground-test/unit.db", import.meta.url).pathname}?connection_limit=1`,
     },
     // Every DB-touching test file's afterEach does an unscoped deleteMany()
     // (simplest way to keep each test isolated within its own file). Running
